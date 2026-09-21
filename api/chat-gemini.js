@@ -34,7 +34,7 @@ export default async function handler(req, res) {
 
     const {
       messages = [],
-      model = 'gemini-3.6-flash',
+      model = 'gemini-3.5-flash-lite',
       systemInstruction = 'You are a helpful and knowledgeable Full-Stack AI assistant specializing in Supabase, Node.js, and React.',
       temperature = 0.7,
     } = req.body || {};
@@ -62,26 +62,51 @@ export default async function handler(req, res) {
       };
     }
 
-    const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${key}`;
+    const candidateModels = Array.from(new Set([
+      model,
+      'gemini-3.5-flash-lite',
+      'gemini-flash-lite-latest',
+      'gemini-3.6-flash',
+    ])).filter(Boolean);
 
-    const geminiRes = await fetch(geminiEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestPayload),
-    });
+    let lastError = null;
+    let geminiData = null;
+    let usedModel = model;
 
-    const geminiData = await geminiRes.json();
+    for (const currentModel of candidateModels) {
+      try {
+        const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(currentModel)}:generateContent?key=${key}`;
+        const geminiRes = await fetch(geminiEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestPayload),
+        });
 
-    if (!geminiRes.ok) {
-      return res.status(geminiRes.status).json({
-        error: geminiData.error?.message || 'Failed to generate response from Gemini API',
+        const data = await geminiRes.json();
+        if (geminiRes.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+          geminiData = data;
+          usedModel = currentModel;
+          break;
+        } else {
+          lastError = data.error?.message || `HTTP ${geminiRes.status}`;
+          console.warn(`[Gemini API] Model ${currentModel} returned: ${lastError}. Trying fallback model...`);
+        }
+      } catch (err) {
+        lastError = err.message;
+        console.warn(`[Gemini API] Model ${currentModel} fetch failed: ${err.message}. Trying fallback...`);
+      }
+    }
+
+    if (!geminiData) {
+      return res.status(503).json({
+        error: `Gemini API service temporarily busy: ${lastError}`,
       });
     }
 
-    const reply = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const reply = geminiData.candidates[0].content.parts[0].text;
     return res.status(200).json({
       reply,
-      model,
+      model: usedModel,
       usage: geminiData.usageMetadata,
     });
   } catch (err) {

@@ -21,7 +21,7 @@ export default function App() {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [model, setModel] = useState('gemini-3.6-flash');
+  const [model, setModel] = useState('gemini-3.5-flash-lite');
   const [systemInstruction, setSystemInstruction] = useState(
     'You are an expert Full-Stack developer and GenAI engineer. Provide clear, accurate, and practical explanations with code examples.'
   );
@@ -84,6 +84,10 @@ export default function App() {
 
       if (!res.ok) {
         throw new Error(data.error || `HTTP ${res.status}: Failed to get AI response`);
+      }
+
+      if (data.model && data.model !== model) {
+        setModel(data.model);
       }
 
       const botReply = {

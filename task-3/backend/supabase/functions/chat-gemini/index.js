@@ -29,7 +29,7 @@ export default async function handler(req) {
     const body = await req.json();
     const {
       messages = [],
-      model = "gemini-3.6-flash",
+      model = "gemini-3.5-flash-lite",
       systemInstruction = "You are a helpful and knowledgeable Full-Stack AI assistant specializing in Supabase, Node.js, and React.",
       temperature = 0.7,
     } = body;
@@ -62,24 +62,46 @@ export default async function handler(req) {
       };
     }
 
-    // Call Gemini API
-    const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-      model
-    )}:generateContent?key=${apiKey}`;
+    const candidateModels = Array.from(new Set([
+      model,
+      "gemini-3.5-flash-lite",
+      "gemini-flash-lite-latest",
+      "gemini-3.6-flash",
+    ])).filter(Boolean);
 
-    const geminiRes = await fetch(geminiEndpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestPayload),
-    });
+    let lastError = null;
+    let geminiData = null;
+    let usedModel = model;
 
-    const geminiData = await geminiRes.json();
+    for (const currentModel of candidateModels) {
+      try {
+        const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+          currentModel
+        )}:generateContent?key=${apiKey}`;
 
-    if (!geminiRes.ok) {
-      const errMsg = geminiData.error?.message || `Gemini API returned HTTP ${geminiRes.status}`;
+        const geminiRes = await fetch(geminiEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestPayload),
+        });
+
+        const data = await geminiRes.json();
+        if (geminiRes.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+          geminiData = data;
+          usedModel = currentModel;
+          break;
+        } else {
+          lastError = data.error?.message || `HTTP ${geminiRes.status}`;
+        }
+      } catch (err) {
+        lastError = err.message;
+      }
+    }
+
+    if (!geminiData) {
       return new Response(
-        JSON.stringify({ error: errMsg, details: geminiData }),
-        { status: geminiRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: `Gemini API service temporarily busy: ${lastError}` }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -91,7 +113,7 @@ export default async function handler(req) {
     return new Response(
       JSON.stringify({
         success: true,
-        model,
+        model: usedModel,
         reply: replyText,
         finishReason: candidate?.finishReason || "STOP",
         usageMetadata: geminiData.usageMetadata || null,
