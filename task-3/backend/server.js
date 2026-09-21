@@ -1,127 +1,93 @@
-import express from 'express';
-import cors from 'cors';
+// Native Node.js HTTP Runner for Supabase Edge Function (chat-gemini)
+// Note: Built using native node:http standard library - ZERO Express dependencies.
+// Executes the canonical Supabase Edge Function (supabase/functions/chat-gemini/index.js).
+
+import http from 'node:http';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import handler from './supabase/functions/chat-gemini/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '.env') });
 
-const app = express();
-const PORT = process.env.TASK3_PORT || 54323;
+const PORT = process.env.TASK3_PORT || process.env.PORT || 54323;
 
-app.use(cors());
-app.use(express.json());
+const server = http.createServer(async (nodeReq, nodeRes) => {
+  // CORS Preflight
+  nodeRes.setHeader('Access-Control-Allow-Origin', '*');
+  nodeRes.setHeader('Access-Control-Allow-Headers', 'authorization, x-client-info, apikey, content-type');
+  nodeRes.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
 
-const apiKey = process.env.GEMINI_API_KEY || '';
-
-// Health check
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    task: 'task-3',
-    runtime: `Node.js ${process.version}`,
-    geminiKeyConfigured: Boolean(apiKey && apiKey !== 'your-gemini-api-key-here')
-  });
-});
-
-// Emulated Edge Function endpoint: /functions/v1/chat-gemini
-app.post('/functions/v1/chat-gemini', async (req, res) => {
-  try {
-    const key = process.env.GEMINI_API_KEY || apiKey;
-    if (!key || key === 'your-gemini-api-key-here') {
-      return res.status(500).json({
-        error: 'GEMINI_API_KEY is not configured in task-3/backend/.env. Please add your Gemini API key to start chatting.'
-      });
-    }
-
-    const {
-      messages = [],
-      model = 'gemini-3.5-flash-lite',
-      systemInstruction = 'You are a helpful and knowledgeable Full-Stack AI assistant specializing in Supabase, Node.js, and React.',
-      temperature = 0.7
-    } = req.body;
-
-    if (!messages || messages.length === 0) {
-      return res.status(400).json({ error: 'messages array cannot be empty' });
-    }
-
-    const geminiContents = messages.map((m) => ({
-      role: m.role === 'assistant' || m.role === 'model' ? 'model' : 'user',
-      parts: [{ text: m.content || m.text || '' }]
-    }));
-
-    const requestPayload = {
-      contents: geminiContents,
-      generationConfig: {
-        temperature: parseFloat(temperature) || 0.7,
-        maxOutputTokens: 2048,
-      }
-    };
-
-    if (systemInstruction) {
-      requestPayload.systemInstruction = {
-        parts: [{ text: systemInstruction }]
-      };
-    }
-
-    const candidateModels = Array.from(new Set([
-      model,
-      'gemini-3.5-flash-lite',
-      'gemini-flash-lite-latest',
-      'gemini-3.6-flash',
-    ])).filter(Boolean);
-
-    let lastError = null;
-    let geminiData = null;
-    let usedModel = model;
-
-    for (const currentModel of candidateModels) {
-      try {
-        const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(currentModel)}:generateContent?key=${key}`;
-        const geminiRes = await fetch(geminiEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestPayload)
-        });
-
-        const data = await geminiRes.json();
-        if (geminiRes.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-          geminiData = data;
-          usedModel = currentModel;
-          break;
-        } else {
-          lastError = data.error?.message || `HTTP ${geminiRes.status}`;
-          console.warn(`[Gemini API] Model ${currentModel} returned: ${lastError}. Trying fallback model...`);
-        }
-      } catch (err) {
-        lastError = err.message;
-        console.warn(`[Gemini API] Model ${currentModel} fetch failed: ${err.message}. Trying fallback...`);
-      }
-    }
-
-    if (!geminiData) {
-      return res.status(503).json({
-        error: `Gemini API service temporarily busy: ${lastError}`
-      });
-    }
-
-    const candidate = geminiData.candidates?.[0];
-    const replyText = candidate?.content?.parts?.map((p) => p.text).join('') || 'No response generated.';
-
-    return res.json({
-      success: true,
-      model: usedModel,
-      reply: replyText,
-      finishReason: candidate?.finishReason || 'STOP',
-      usageMetadata: geminiData.usageMetadata || null,
-      timestamp: new Date().toISOString()
-    });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
+  if (nodeReq.method === 'OPTIONS') {
+    nodeRes.writeHead(200);
+    nodeRes.end('ok');
+    return;
   }
+
+  // Health check endpoint
+  if (nodeReq.method === 'GET' && (nodeReq.url === '/health' || nodeReq.url === '/')) {
+    nodeRes.writeHead(200, { 'Content-Type': 'application/json' });
+    nodeRes.end(JSON.stringify({
+      status: 'ok',
+      task: 'task-3',
+      backend: 'Supabase Edge Function',
+      runtime: `Node.js ${process.version} (Native HTTP - No Express)`,
+      function: 'chat-gemini',
+      geminiKeyConfigured: Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your-gemini-api-key-here')
+    }));
+    return;
+  }
+
+  // Supabase Edge Function endpoint: /functions/v1/chat-gemini
+  if (nodeReq.method === 'POST' && (nodeReq.url === '/functions/v1/chat-gemini' || nodeReq.url === '/chat-gemini')) {
+    try {
+      // Buffer request payload
+      const chunks = [];
+      for await (const chunk of nodeReq) {
+        chunks.push(chunk);
+      }
+      const rawBody = Buffer.concat(chunks).toString();
+
+      // Convert Node HTTP request to standard Web API Request object for Supabase Edge Function
+      const headers = new Headers();
+      for (const [key, value] of Object.entries(nodeReq.headers)) {
+        if (value) {
+          headers.set(key, Array.isArray(value) ? value.join(', ') : value);
+        }
+      }
+
+      const webReq = new Request(`http://localhost:${PORT}${nodeReq.url}`, {
+        method: 'POST',
+        headers,
+        body: rawBody || undefined
+      });
+
+      // Invoke Supabase Edge Function handler
+      const webRes = await handler(webReq);
+
+      // Convert Web API Response to Node HTTP response
+      const responseHeaders = {};
+      webRes.headers.forEach((val, key) => {
+        responseHeaders[key] = val;
+      });
+      responseHeaders['Access-Control-Allow-Origin'] = '*';
+
+      nodeRes.writeHead(webRes.status, responseHeaders);
+      const resText = await webRes.text();
+      nodeRes.end(resText);
+    } catch (err) {
+      nodeRes.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      nodeRes.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
+  nodeRes.writeHead(404, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+  nodeRes.end(JSON.stringify({ error: 'Endpoint not found. Use POST /functions/v1/chat-gemini' }));
 });
 
-app.listen(PORT, () => {
-  console.log(`[Task-3 Backend] Gemini Edge Function runner listening at http://localhost:${PORT}`);
+server.listen(PORT, () => {
+  console.log(`[Supabase Edge Function] chat-gemini listening at http://localhost:${PORT}/functions/v1/chat-gemini`);
+  console.log(`[Architecture] Native runtime active (Zero Express dependencies)`);
 });

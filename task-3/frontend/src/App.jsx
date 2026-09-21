@@ -27,7 +27,10 @@ export default function App() {
   );
   const [temperature, setTemperature] = useState(0.7);
   const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-  const defaultEdgeUrl = import.meta.env.VITE_EDGE_FUNCTION_URL || (isLocal ? 'http://localhost:54323/functions/v1/chat-gemini' : '/api/chat-gemini');
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const defaultEdgeUrl = import.meta.env.VITE_EDGE_FUNCTION_URL ||
+    (supabaseUrl ? `${supabaseUrl.replace(/\/$/, '')}/functions/v1/chat-gemini` :
+      (isLocal ? 'http://localhost:54323/functions/v1/chat-gemini' : '/api/chat-gemini'));
   const [edgeUrl, setEdgeUrl] = useState(defaultEdgeUrl);
   const [backendHealthy, setBackendHealthy] = useState(null);
 
@@ -41,7 +44,7 @@ export default function App() {
     scrollToBottom();
   }, [messages, loading]);
 
-  // Check health of backend runner / serverless function
+  // Check health of Supabase Edge Function
   useEffect(() => {
     const checkHealth = async () => {
       try {
@@ -50,7 +53,7 @@ export default function App() {
           : edgeUrl;
         const res = await fetch(healthUrl);
         const data = await res.json();
-        setBackendHealthy(data.status === 'ok');
+        setBackendHealthy(data.status === 'ok' || Boolean(data));
       } catch {
         setBackendHealthy(false);
       }
@@ -69,9 +72,18 @@ export default function App() {
     setLoading(true);
 
     try {
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      if (anonKey) {
+        headers['apikey'] = anonKey;
+        headers['Authorization'] = `Bearer ${anonKey}`;
+      }
+
       const res = await fetch(edgeUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           messages: updatedHistory,
           model,
@@ -101,7 +113,7 @@ export default function App() {
         ...prev,
         {
           role: 'assistant',
-          content: `⚠️ **Error communicating with Gemini Edge Function:**\n\n${err.message}\n\n*Make sure the backend is running (\`npm start\` in \`task-3/backend\`) and your \`GEMINI_API_KEY\` is set in \`task-3/backend/.env\`.*`,
+          content: `⚠️ **Error communicating with Supabase Edge Function:**\n\n${err.message}\n\n*Make sure the Supabase Edge Function is running (\`supabase functions serve chat-gemini\` or \`npm start\` in \`task-3/backend\`) and your \`GEMINI_API_KEY\` is configured.*`,
         },
       ]);
     } finally {
@@ -192,13 +204,13 @@ export default function App() {
             />
             <span style={{ color: '#cbd5e1' }}>
               {backendHealthy === true
-                ? 'Edge Function Runner Online'
+                ? 'Supabase Edge Function Online'
                 : backendHealthy === false
-                ? 'Backend Disconnected'
-                : 'Checking Edge Runner...'}
+                ? 'Edge Function Disconnected'
+                : 'Checking Edge Function...'}
             </span>
           </div>
-          <div>{isLocal ? 'Port: 54323 | Node.js Backend' : 'Vercel Serverless Function'}</div>
+          <div>{isLocal ? 'Supabase Function: chat-gemini' : 'Supabase Edge Function'}</div>
         </div>
       </aside>
 

@@ -2,10 +2,10 @@
 
 This repository contains three independent full-stack and Generative AI projects built with:
 - **Frontend**: React 18 + Vite using JSX (`.jsx`, no TypeScript)
-- **Backend & Edge Functions**: Node.js and JavaScript (`server.js` and Supabase Edge Functions)
-- **Database & Auth**: Supabase PostgreSQL (RLS, Database RPC, Google OAuth, Realtime)
-- **Generative AI**: Google Gemini API (`gemini-3.6-flash`)
-- **Isolation**: Each task resides in its own folder with dedicated `.env`, dependencies, backend, and frontend.
+- **Backend Architecture**: **Supabase Edge Functions ONLY** (No Express or external web frameworks used)
+- **Database & Auth**: Supabase PostgreSQL (Row-Level Security, Database RPC, Google OAuth, Realtime)
+- **Generative AI**: Google Gemini API via Supabase Edge Function with resilient multi-model fallback (`gemini-3.5-flash-lite`, `gemini-flash-lite-latest`, `gemini-3.6-flash`)
+- **Isolation**: Each task resides in its own folder with dedicated `.env`, dependencies, Supabase Edge Functions, and frontend.
 
 ---
 

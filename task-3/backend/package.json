@@ -1,16 +1,15 @@
 {
   "name": "task-3-backend",
   "version": "1.0.0",
-  "description": "Task 3 Gemini API Edge Function and Node.js backend",
+  "description": "Task 3 Supabase Edge Function Runner (Zero Express)",
   "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "serve:supabase": "supabase functions serve chat-gemini --no-verify-jwt"
   },
   "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2"
+    "dotenv": "^16.4.7"
   }
 }

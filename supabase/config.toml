@@ -1,0 +1,13 @@
+# Supabase Project Configuration
+# Defines the Edge Functions for local serving via Supabase CLI
+
+project_id = "smaranai-tasks"
+
+[functions.chat-gemini]
+verify_jwt = false
+
+[functions.admin-action]
+verify_jwt = false
+
+[functions.log-login]
+verify_jwt = false

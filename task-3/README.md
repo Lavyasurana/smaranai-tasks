@@ -2,8 +2,8 @@
 
 A full-stack Generative AI application featuring:
 - **React Frontend (JSX + Vite)**: Modern AI chatbot interface with Markdown code highlighting, prompt presets, dynamic model selection, and latency/token stats.
-- **Supabase Edge Function (`chat-gemini`)**: JavaScript serverless Edge Function that communicates with Google's Gemini API (`gemini-2.5-flash`, `gemini-1.5-flash`, `gemini-1.5-pro`), formats multi-turn chat history, and securely safeguards API keys on the server.
-- **Node.js Local Runner (`server.js`)**: Standalone Express server in Node.js allowing 1-command local execution and testing of the Edge Function endpoint.
+- **Supabase Edge Function (`chat-gemini`)**: JavaScript serverless Edge Function that communicates with Google's Gemini API (`gemini-3.5-flash-lite`, `gemini-flash-lite-latest`, `gemini-3.6-flash`), formats multi-turn chat history, and securely safeguards API keys on the server.
+- **Pure Supabase Backend (Zero Express)**: Supabase Edge Functions are the ONLY backend used across the project. No Express or third-party web frameworks are used. A lightweight native Node.js HTTP runner is included solely for local testing without requiring Deno.
 
 ---
 
@@ -11,11 +11,12 @@ A full-stack Generative AI application featuring:
 
 ```
 task-3/
+├── supabase/
+│   └── functions/chat-gemini/index.js        # Official Supabase Edge Function
 ├── backend/
-│   ├── supabase/
-│   │   └── functions/chat-gemini/index.js    # Supabase Edge function for Gemini
-│   ├── server.js                             # Node.js local runner for Edge Function
-│   ├── package.json
+│   ├── supabase/functions/chat-gemini/       # Supabase Edge Function handler
+│   ├── server.js                             # Zero-Express native runner for local testing
+│   ├── package.json                          # Zero Express dependencies (dotenv only)
 │   ├── .env.example
 │   └── .env
 └── frontend/
@@ -52,13 +53,22 @@ task-3/
 
 *(You can also customize the Edge Function URL, model selection, temperature, and system prompt directly in the frontend UI by clicking "Settings".)*
 
-### 3. Run the Backend (Node.js Edge Function Runner)
+### 3. Run the Supabase Edge Function Backend
+You have two options to run the Supabase Function backend:
+
+**Option A: Via Official Supabase CLI (Recommended)**
+```bash
+supabase functions serve chat-gemini --no-verify-jwt
+```
+Runs at `http://localhost:54321/functions/v1/chat-gemini`.
+
+**Option B: Via Native Zero-Express Runner**
 ```bash
 cd task-3/backend
 npm install
 npm start
 ```
-Runs at `http://localhost:54323`.
+Runs at `http://localhost:54323/functions/v1/chat-gemini` (uses native `node:http`, zero Express).
 
 ### 4. Run the Frontend (React + Vite)
 ```bash

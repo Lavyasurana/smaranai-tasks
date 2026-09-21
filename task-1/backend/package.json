@@ -1,18 +1,16 @@
 {
   "name": "task-1-backend",
   "version": "1.0.0",
-  "description": "Task 1 Supabase backend and Edge Functions in Node.js",
+  "description": "Task 1 Supabase Edge Functions backend (Zero Express)",
   "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "serve:supabase": "supabase functions serve admin-action --no-verify-jwt"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
-    "pg": "^8.23.0"
+    "dotenv": "^16.4.7"
   }
 }
