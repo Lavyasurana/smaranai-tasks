@@ -16,6 +16,7 @@ dist/
 dist-ssr/
 build/
 .output/
+*.zip
 
 # Environment Variables & Secrets (Prevent accidental leaks to GitHub)
 .env
